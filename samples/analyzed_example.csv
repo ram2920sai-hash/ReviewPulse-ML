@@ -1,0 +1,13 @@
+﻿review_id,review,channel,rp_negative_score,rp_neutral_score,rp_positive_score,rp_sentiment,rp_confidence,rp_status
+101,The headphones sound incredible and arrived a day early.,Website,0.004558649379760027,0.010463941842317581,0.9849773645401001,Positive,0.9849773645401001,Analyzed
+102,The package was damaged and customer support never replied.,Email,0.915825605392456,0.0786752924323082,0.005499102640897036,Negative,0.915825605392456,Analyzed
+103,The item arrived on Tuesday. It is the blue version.,Website,0.004967754706740379,0.8843392729759216,0.11069294810295105,Neutral,0.8843392729759216,Analyzed
+104,Really comfortable shoes. I would buy these again!,Mobile app,0.003317219438031316,0.00836303923279047,0.9883197546005249,Positive,0.9883197546005249,Analyzed
+105,Battery stopped charging after two days. Very disappointed.,Website,0.9180908203125,0.07391857355833054,0.007990573532879353,Negative,0.9180908203125,Analyzed
+106,Setup took ten minutes. The cable is one meter long.,Email,0.04642684385180473,0.8176230192184448,0.13595011830329895,Neutral,0.8176230192184448,Analyzed
+107,Excellent quality for the price. Absolutely love it.,Mobile app,0.007284408435225487,0.013819556683301926,0.9788959622383118,Positive,0.9788959622383118,Analyzed
+108,Delivery was late and the wrong size was sent.,Website,0.8110312223434448,0.17685849964618683,0.012110298499464989,Negative,0.8110312223434448,Analyzed
+109,It works fine but the instructions could be clearer.,Email,0.06326772272586823,0.47835052013397217,0.4583818018436432,Neutral,0.47835052013397217,Analyzed
+110,The headphones sound incredible and arrived a day early.,Mobile app,0.004558649379760027,0.010463941842317581,0.9849773645401001,Positive,0.9849773645401001,Analyzed
+111,,Website,,,,,,Invalid: empty or non-text review
+112,Support resolved my issue quickly. Thank you!,Email,0.01492296066135168,0.10278108716011047,0.8822959661483765,Positive,0.8822959661483765,Analyzed
