@@ -17,6 +17,20 @@ def preprocess(text):
                     for t in text.split(" "))
 
 
+def load_pretrained(loader, cache_dir=MODEL_CACHE):
+    """Reuse complete cache entries; download when weights are missing on a fresh host."""
+    try:
+        return loader.from_pretrained(MODEL_ID, cache_dir=cache_dir, local_files_only=True)
+    except OSError:
+        pass
+    except AttributeError as exc:
+        # Transformers 4.57 can return a None checkpoint path for a config-only cache.
+        # It then calls .endswith() on that path instead of raising a cache-miss OSError.
+        if str(exc) != "'NoneType' object has no attribute 'endswith'":
+            raise
+    return loader.from_pretrained(MODEL_ID, cache_dir=cache_dir)
+
+
 class SentimentEngine:
     def __init__(self):
         import torch
@@ -24,14 +38,9 @@ class SentimentEngine:
         started = time.perf_counter()
         self.torch = torch
         self.lock = threading.Lock()
-        def load(loader):
-            try:
-                return loader.from_pretrained(MODEL_ID, cache_dir=MODEL_CACHE, local_files_only=True)
-            except OSError:
-                return loader.from_pretrained(MODEL_ID, cache_dir=MODEL_CACHE)
         # Prefer complete on-disk assets: warm starts and offline sessions need no metadata request.
-        self.tokenizer = load(AutoTokenizer)
-        self.model = load(AutoModelForSequenceClassification)
+        self.tokenizer = load_pretrained(AutoTokenizer)
+        self.model = load_pretrained(AutoModelForSequenceClassification)
         self.labels = class_labels(self.model.config.id2label)
         self.device = "cpu"
         if torch.cuda.is_available():
