@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 from data import analyze_frame, read_csv, safe_csv, validate_review
-from inference import class_labels, preprocess, load_pretrained
+from inference import class_labels, preprocess, resolve_model_snapshot, MODEL_FILES
 
 
 def test_model_labels_follow_config_not_assumed_order():
@@ -53,27 +53,36 @@ def test_authors_preprocessing():
     assert preprocess("Hi @someone https://example.com") == "Hi @user http"
 
 
-@pytest.mark.parametrize("cache_error", [OSError("Weights are not cached"),
-    AttributeError("'NoneType' object has no attribute 'endswith'")])
-def test_missing_weights_can_download_after_local_cache_miss(cache_error):
-    class Loader:
-        calls = []
-        @classmethod
-        def from_pretrained(cls, model_id, **kwargs):
-            cls.calls.append(kwargs)
-            if kwargs.get("local_files_only"):
-                raise cache_error
-            return "downloaded-model"
-    assert load_pretrained(Loader, cache_dir="isolated-test-cache") == "downloaded-model"
-    assert len(Loader.calls) == 2
-    assert Loader.calls[0]["local_files_only"] is True
-    assert "local_files_only" not in Loader.calls[1]
+def test_complete_snapshot_is_used_offline(tmp_path, monkeypatch):
+    import huggingface_hub
+    for name in MODEL_FILES:
+        (tmp_path / name).write_text("cached")
+    monkeypatch.setattr(huggingface_hub, "try_to_load_from_cache", lambda repo, name, **kw: str(tmp_path / name))
+    def no_network(**kwargs):
+        raise AssertionError("A complete cache must not require network access")
+    monkeypatch.setattr(huggingface_hub, "snapshot_download", no_network)
+    assert resolve_model_snapshot(tmp_path) == tmp_path
 
 
-def test_unrelated_loader_errors_are_not_hidden():
-    class BrokenLoader:
-        @staticmethod
-        def from_pretrained(*args, **kwargs):
-            raise AttributeError("Unrelated model implementation error")
-    with pytest.raises(AttributeError, match="Unrelated model"):
-        load_pretrained(BrokenLoader)
+def test_config_only_cache_downloads_missing_weights(tmp_path, monkeypatch):
+    import huggingface_hub
+    (tmp_path / "config.json").write_text("cached-config")
+    monkeypatch.setattr(huggingface_hub, "try_to_load_from_cache",
+        lambda repo, name, **kw: str(tmp_path / name) if name == "config.json" else None)
+    requested = []
+    def download(**kwargs):
+        requested.extend(kwargs["allow_patterns"])
+        for name in MODEL_FILES:
+            (tmp_path / name).write_text("downloaded")
+        return str(tmp_path)
+    monkeypatch.setattr(huggingface_hub, "snapshot_download", download)
+    assert resolve_model_snapshot(tmp_path) == tmp_path
+    assert "pytorch_model.bin" in requested
+
+
+def test_incomplete_download_is_reported_before_loading(tmp_path, monkeypatch):
+    import huggingface_hub
+    monkeypatch.setattr(huggingface_hub, "try_to_load_from_cache", lambda *a, **kw: None)
+    monkeypatch.setattr(huggingface_hub, "snapshot_download", lambda **kw: str(tmp_path))
+    with pytest.raises(OSError, match="pytorch_model.bin"):
+        resolve_model_snapshot(tmp_path)

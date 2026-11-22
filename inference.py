@@ -2,6 +2,7 @@
 import threading
 import time
 from functools import lru_cache
+from pathlib import Path
 from config import MODEL_ID, MODEL_CACHE
 
 
@@ -17,30 +18,37 @@ def preprocess(text):
                     for t in text.split(" "))
 
 
-def load_pretrained(loader, cache_dir=MODEL_CACHE):
-    """Reuse complete cache entries; download when weights are missing on a fresh host."""
-    try:
-        return loader.from_pretrained(MODEL_ID, cache_dir=cache_dir, local_files_only=True)
-    except OSError:
-        pass
-    except AttributeError as exc:
-        # Transformers 4.57 can return a None checkpoint path for a config-only cache.
-        # It then calls .endswith() on that path instead of raising a cache-miss OSError.
-        if str(exc) != "'NoneType' object has no attribute 'endswith'":
-            raise
-    return loader.from_pretrained(MODEL_ID, cache_dir=cache_dir)
+MODEL_FILES = ("config.json", "pytorch_model.bin", "vocab.json", "merges.txt", "special_tokens_map.json")
+
+
+def resolve_model_snapshot(cache_dir=MODEL_CACHE):
+    """Resolve actual files before Transformers loads this PyTorch-only checkpoint."""
+    from huggingface_hub import snapshot_download, try_to_load_from_cache
+    cached = [try_to_load_from_cache(MODEL_ID, name, cache_dir=cache_dir) for name in MODEL_FILES]
+    if (all(isinstance(p, str) and Path(p).is_file() for p in cached)
+            and len({Path(p).parent for p in cached}) == 1):
+        return Path(cached[0]).parent
+    snapshot = Path(snapshot_download(repo_id=MODEL_ID, cache_dir=cache_dir,
+                                      allow_patterns=list(MODEL_FILES), max_workers=1))
+    missing = [name for name in MODEL_FILES if not (snapshot / name).is_file()]
+    if missing:
+        raise OSError("Model download is incomplete. Missing files: " + ", ".join(missing))
+    return snapshot
 
 
 class SentimentEngine:
-    def __init__(self):
+    def __init__(self, cache_dir=MODEL_CACHE):
         import torch
         from transformers import AutoTokenizer, AutoModelForSequenceClassification
         started = time.perf_counter()
         self.torch = torch
         self.lock = threading.Lock()
-        # Prefer complete on-disk assets: warm starts and offline sessions need no metadata request.
-        self.tokenizer = load_pretrained(AutoTokenizer)
-        self.model = load_pretrained(AutoModelForSequenceClassification)
+        snapshot = resolve_model_snapshot(cache_dir)
+        self.tokenizer = AutoTokenizer.from_pretrained(snapshot, local_files_only=True)
+        # The original Cardiff NLP repository publishes pytorch_model.bin, not safetensors.
+        # An explicit format and verified local path avoid Transformers' None checkpoint bug.
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            snapshot, local_files_only=True, use_safetensors=False)
         self.labels = class_labels(self.model.config.id2label)
         self.device = "cpu"
         if torch.cuda.is_available():

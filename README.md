@@ -14,6 +14,8 @@ python -m venv .venv
 
 Open the local URL printed by Streamlit. First analysis downloads the Cardiff NLP model into `.model-cache/` (allow disk space for the model and dependencies). Subsequent analyses reuse the loaded model. No Hugging Face token or paid API is required. The initial download requires internet access; cached files support later offline use.
 
+Model loading explicitly downloads and verifies the original model's configuration, PyTorch weights, and tokenizer files before opening the local snapshot. A complete cached snapshot is reused without network access. This avoids a Transformers checkpoint-resolution error on fresh cloud servers that have a configuration file but no downloaded weights.
+
 On this computer, dependencies were installed in the parent workspace's `.venv`. Double-click `Start-ReviewPulse.cmd` to use that environment. For a standalone copy, run `Setup-ReviewPulse.cmd` once, then `Start-ReviewPulse.cmd`. A portable source ZIP excludes model files and environments; a new computer needs the initial model download.
 
 ## Interface preview
